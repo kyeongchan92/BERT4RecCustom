@@ -4,10 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .attention import MultiHeadedAttention
-from .utils import SublayerConnection, PositionwiseFeedForward
-
-
+from .utils import PositionwiseFeedForward, SublayerConnection
 class TransformerBlock(nn.Module):
     """
     Bidirectional Encoder = Transformer (self-attention)

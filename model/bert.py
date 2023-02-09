@@ -14,8 +14,8 @@
 
 from torch import nn as nn
 
-from bert_modules.embedding import BERTEmbedding
-from bert_modules.transformer import TransformerBlock
+from .bert_modules.embedding import BERTEmbedding
+from .bert_modules.transformer import TransformerBlock
 from utils import fix_random_seed_as
 
 

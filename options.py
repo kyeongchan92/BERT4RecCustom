@@ -1,8 +1,8 @@
-from templates import set_template
-from datasets import DATASETS
-from dataloaders import DATALOADERS
-from models import MODELS
-from trainers import TRAINERS
+# from templates import set_template
+# from datasets import DATASETS
+# from dataloaders import DATALOADERS
+# from models import MODELS
+# from trainers import TRAINERS
 
 import argparse
 
@@ -20,7 +20,7 @@ parser.add_argument('--test_model_path', type=str, default=None)
 
 
 # Dataset
-parser.add_argument('--dataset_code', type=str, default='ml-1m', choices=DATASETS.keys())
+parser.add_argument('--dataset_code', type=str, default='ml-1m')
 parser.add_argument('--min_rating', type=int, default=4, help='Only keep ratings greater than equal to this value')
 parser.add_argument('--min_uc', type=int, default=5, help='Only keep users with more than min_uc ratings')
 parser.add_argument('--min_sc', type=int, default=0, help='Only keep items with more than min_sc ratings')
@@ -31,7 +31,7 @@ parser.add_argument('--eval_set_size', type=int, default=500,
 
 
 # Dataloader
-parser.add_argument('--dataloader_code', type=str, default='bert', choices=DATALOADERS.keys())
+parser.add_argument('--dataloader_code', type=str, default='bert')
 parser.add_argument('--dataloader_random_seed', type=float, default=0.0)
 parser.add_argument('--train_batch_size', type=int, default=64)
 parser.add_argument('--val_batch_size', type=int, default=64)
@@ -50,7 +50,7 @@ parser.add_argument('--test_negative_sampling_seed', type=int, default=None)
 
 
 # Trainer
-parser.add_argument('--trainer_code', type=str, default='bert', choices=TRAINERS.keys())
+parser.add_argument('--trainer_code', type=str, default='bert')
 # device
 parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda'])
 parser.add_argument('--num_gpu', type=int, default=1)
@@ -73,7 +73,7 @@ parser.add_argument('--best_metric', type=str, default='NDCG@10', help='Metric f
 
 
 # Model
-parser.add_argument('--model_code', type=str, default='bert', choices=MODELS.keys())
+parser.add_argument('--model_code', type=str, default='bert')
 parser.add_argument('--model_init_seed', type=int, default=None)
 # BERT #
 parser.add_argument('--bert_max_len', type=int, default=None, help='Length of sequence for bert')
@@ -97,7 +97,8 @@ args = parser.parse_args()
 # Set templates
 args.mode = 'train'
 
-args.dataset_code = 'ml-' + input('Input 1 for ml-1m, 20 for ml-20m: ') + 'm'
+# args.dataset_code = 'ml-' + input('Input 1 for ml-1m, 20 for ml-20m: ') + 'm'
+args.dataset_code = 'ml-1m'
 args.min_rating = 0 if args.dataset_code == 'ml-1m' else 4
 args.min_uc = 5
 args.min_sc = 0
