@@ -118,7 +118,7 @@ args.test_negative_sample_size = 100
 args.test_negative_sampling_seed = 98765
 
 args.trainer_code = 'bert'
-args.device = 'cuda'
+# args.device = 'cuda'
 args.num_gpu = 1
 args.device_idx = '0'
 args.optimizer = 'Adam'

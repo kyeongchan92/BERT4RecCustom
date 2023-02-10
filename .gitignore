@@ -1,0 +1,12 @@
+*.pth
+*.0
+*.json
+
+*.pyc
+__pycache__/
+
+*.python-version
+*.py[cod]
+__pycache__/options.cpython-39.pyc
+
+/expriments

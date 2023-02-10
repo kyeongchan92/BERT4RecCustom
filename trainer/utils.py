@@ -48,3 +48,72 @@ def recalls_and_ndcgs_for_ks(scores, labels, ks):
        metrics['NDCG@%d' % k] = ndcg.cpu().item()
 
     return metrics
+
+
+class PrintInputShape:
+    flag = True
+
+    @classmethod
+    def print_shape(self, t):
+        if len(t.size()) == 2:
+            self.print_2d_shape(t)
+        elif len(t.size()) == 3:
+            self.print_3d_shape(t)
+        else:
+            print(f"over 3d")
+
+    @classmethod
+    def print_2d_shape(self, t, ws=''):
+        if self.flag:
+            t_trim = t.clone().detach()[:4]
+            for line, _ in enumerate(t_trim, start=1):
+                if line == 1:  # 첫 번째 줄
+                    s = '^'
+                    sample = f"{_[0]:5}, {_[1]:5}, ..., {_[-1]:5}"
+                elif line == len(t_trim):  # 마지막 줄
+                    s = 'v'
+                    sample = f"{_[0]:5}, {_[1]:5}, ..., {_[-1]:5}"
+                else:
+                    s = '|'
+                    sample = f"\t\t."
+                print(f"{ws}{s} {sample}")
+
+                if line == len(t_trim)//2:  # 중간에 숫자 끼워넣기
+                    print(f"{ws}{t.size()[0]}")
+
+            print(f"{ws}<-- {t.size()[1]} -->")
+
+            self.flag = False
+
+    @classmethod
+    def print_3d_shape(self, t):
+        if self.flag:
+            print(f"Input's shape : {t.size()}")
+            ws = ''
+            print(f"{ws}\\")
+            ws += ' '
+            print(f"{ws}{t.size()[0]}")
+            ws += ' '
+            print(f"{ws}\\")
+
+            print_2d_shape(self, t[-1], ws=ws)
+            # for line, _ in enumerate(t[-1], start=1):
+            #     if line == 1:
+            #         s = '^'
+            #         sample = f"{_[0]}, {_[1]}, ..., {_[-1]}"
+            #     elif line == len(t[-1]):  # 마지막줄
+            #         s = 'v'
+            #         sample = f"{_[0]}, {_[1]}, ..., {_[-1]}"
+            #     else:
+            #         s = '|'
+            #         sample = f"\t\t."
+            #     print(f"{ws}{s} {sample}")
+
+            #     if line == len(t[-1])//2:
+            #         print(f"{t.size()[1]}")
+
+            # print(f"{ws}<-- {t.size()[2]} -->")
+
+        self.flag = False
+
+

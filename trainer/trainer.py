@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 # from .base import AbstractTrainer
-from .utils import recalls_and_ndcgs_for_ks
+from .utils import recalls_and_ndcgs_for_ks, PrintInputShape
 
 import torch.nn as nn
 
@@ -23,6 +23,7 @@ class BERTTrainer:
     def __init__(self, args, model, train_loader, val_loader, test_loader, export_root):
         self.args = args
         self.device = args.device
+        print(self.device)
         self.model = model.to(self.device)
         self.is_parallel = args.num_gpu > 1
         if self.is_parallel:
@@ -41,7 +42,7 @@ class BERTTrainer:
 
         self.export_root = export_root
         self.writer, self.train_loggers, self.val_loggers = self._create_loggers()
-        self.add_extra_loggers()
+        # self.add_extra_loggers()
         self.logger_service = LoggerService(self.train_loggers, self.val_loggers)
         self.log_period_as_iter = args.log_period_as_iter
 
@@ -50,7 +51,7 @@ class BERTTrainer:
     def train(self):
         accum_iter = 0
         self.validate(0, accum_iter)
-        for epoch in range(self.num_epochs):
+        for epoch in range(1, self.num_epochs+1):
             accum_iter = self.train_one_epoch(epoch, accum_iter)
             self.validate(epoch, accum_iter)
         self.logger_service.complete({
@@ -60,8 +61,6 @@ class BERTTrainer:
 
     def train_one_epoch(self, epoch, accum_iter):
         self.model.train()
-        if self.args.enable_lr_schedule:
-            self.lr_scheduler.step()
 
         average_meter_set = AverageMeterSet()
         tqdm_dataloader = tqdm(self.train_loader)
@@ -78,7 +77,7 @@ class BERTTrainer:
 
             average_meter_set.update('loss', loss.item())
             tqdm_dataloader.set_description(
-                'Epoch {}, loss {:.3f} '.format(epoch+1, average_meter_set['loss'].avg))
+                'Epoch {}, loss {:.3f} '.format(epoch, average_meter_set['loss'].avg))
 
             accum_iter += batch_size
 
@@ -90,8 +89,11 @@ class BERTTrainer:
                     'accum_iter': accum_iter,
                 }
                 log_data.update(average_meter_set.averages())
-                self.log_extra_train_info(log_data)
+                # self.log_extra_train_info(log_data)
                 self.logger_service.log_train(log_data)
+
+        if self.args.enable_lr_schedule:
+            self.lr_scheduler.step()
 
         return accum_iter
 
@@ -122,7 +124,7 @@ class BERTTrainer:
                 'accum_iter': accum_iter,
             }
             log_data.update(average_meter_set.averages())
-            self.log_extra_val_info(log_data)
+            # self.log_extra_val_info(log_data)
             self.logger_service.log_val(log_data)
 
     def test(self):
@@ -194,15 +196,13 @@ class BERTTrainer:
         return accum_iter % self.log_period_as_iter < self.args.train_batch_size and accum_iter != 0
 
 
-
-
     @classmethod
     def code(cls):
         return 'bert'
 
-
     def calculate_loss(self, batch):
         seqs, labels = batch
+        PrintInputShape.print_shape(seqs)
         logits = self.model(seqs)  # B x T x V
 
         logits = logits.view(-1, logits.size(-1))  # (B*T) x V

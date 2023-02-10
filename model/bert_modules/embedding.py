@@ -20,12 +20,12 @@ class BERTEmbedding(nn.Module):
         super().__init__()
         self.token = TokenEmbedding(vocab_size=vocab_size, embed_size=embed_size)
         self.position = PositionalEmbedding(max_len=max_len, d_model=embed_size)
-        # self.segment = SegmentEmbedding(embed_size=self.token.embedding_dim)
+        # self.genre = nn.Embedding(num_genres, embed_size)
         self.dropout = nn.Dropout(p=dropout)
         self.embed_size = embed_size
 
     def forward(self, sequence):
-        x = self.token(sequence) + self.position(sequence)  # + self.segment(segment_label)
+        x = self.token(sequence) + self.position(sequence)  
         return self.dropout(x)
 
 
