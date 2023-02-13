@@ -2,6 +2,8 @@ import math
 
 import torch.nn as nn
 
+from utils import PrintInputShape
+
 class BERTEmbedding(nn.Module):
     """
     BERT Embedding which is consisted with under features
@@ -11,7 +13,7 @@ class BERTEmbedding(nn.Module):
         sum of all these features are output of BERTEmbedding
     """
 
-    def __init__(self, vocab_size, embed_size, max_len, dropout=0.1):
+    def __init__(self, vocab_size, embed_size, max_len, genre_size, dropout=0.1):
         """
         :param vocab_size: total vocab size
         :param embed_size: embedding size of token embedding
@@ -20,12 +22,17 @@ class BERTEmbedding(nn.Module):
         super().__init__()
         self.token = TokenEmbedding(vocab_size=vocab_size, embed_size=embed_size)
         self.position = PositionalEmbedding(max_len=max_len, d_model=embed_size)
-        # self.genre = nn.Embedding(num_genres, embed_size)
+        self.genre = nn.Embedding(genre_size, embed_size)
         self.dropout = nn.Dropout(p=dropout)
         self.embed_size = embed_size
 
-    def forward(self, sequence):
-        x = self.token(sequence) + self.position(sequence)  
+        self.printer = PrintInputShape(2)
+
+    def forward(self, sequence, gnr):
+        # print(self.printer.cnt)
+        self.printer.print(sequence, notation='sequence')
+        self.printer.print(gnr, notation='gnr')
+        x = self.token(sequence) + self.position(sequence) + self.genre(gnr)
         return self.dropout(x)
 
 

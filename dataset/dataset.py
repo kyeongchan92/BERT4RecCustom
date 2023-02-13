@@ -59,6 +59,13 @@ class ML1MDataset:
         df.columns = ['uid', 'sid', 'rating', 'timestamp']
         return df
 
+    def load_movies_df(self):
+        folder_path = self._get_rawdata_folder_path()
+        file_path = folder_path.joinpath('movies.dat')
+        df = pd.read_csv(file_path, sep='::', header=None, encoding='ISO-8859-1')
+        df.columns = ['sid', 'title', 'genre']
+        return df
+
     def load_dataset(self):
         self.preprocess()
         dataset_path = self._get_preprocessed_dataset_path()
@@ -73,16 +80,24 @@ class ML1MDataset:
         if not dataset_path.parent.is_dir():
             dataset_path.parent.mkdir(parents=True)
         self.maybe_download_raw_dataset()
-        df = self.load_ratings_df()
+        rating_df = self.load_ratings_df()
+        genre_df = self.load_movies_df()
+        df = rating_df.merge(genre_df[['sid', 'genre']], how='left', on='sid')
+
         df = self.make_implicit(df)
         df = self.filter_triplets(df)
-        df, umap, smap = self.densify_index(df)
-        train, val, test = self.split_df(df, len(umap))
+        df, umap, smap, gmap = self.densify_index(df)
+        train, val, test, train_g, val_g, test_g = self.split_df(df, len(umap))
+
         dataset = {'train': train,
                    'val': val,
                    'test': test,
+                   'train_g': train_g,
+                   'val_g': val_g,
+                   'test_g': test_g,
                    'umap': umap,
-                   'smap': smap}
+                   'smap': smap,
+                   'gmap': gmap}
         with dataset_path.open('wb') as f:
             pickle.dump(dataset, f)
 
@@ -137,41 +152,50 @@ class ML1MDataset:
         print('Densifying index')
         umap = {u: i for i, u in enumerate(set(df['uid']))}
         smap = {s: i for i, s in enumerate(set(df['sid']))}
+        gmap = {g: i for i, g in enumerate(set(df['genre']))}
         df['uid'] = df['uid'].map(umap)
         df['sid'] = df['sid'].map(smap)
-        return df, umap, smap
+        df['gid'] = df['genre'].map(gmap)
+        return df, umap, smap, gmap
 
     def split_df(self, df, user_count):
         if self.args.split == 'leave_one_out':
             print('Splitting')
             user_group = df.groupby('uid')
             user2items = user_group.progress_apply(lambda d: list(d.sort_values(by='timestamp')['sid']))
+            user2genres = user_group.progress_apply(lambda d: list(d.sort_values(by='timestamp')['gid']))
+
             train, val, test = {}, {}, {}
+            train_g, val_g, test_g = {}, {}, {}
             for user in range(user_count):
                 items = user2items[user]
                 train[user], val[user], test[user] = items[:-2], items[-2:-1], items[-1:]
-            return train, val, test
-        elif self.args.split == 'holdout':
-            print('Splitting')
-            np.random.seed(self.args.dataset_split_seed)
-            eval_set_size = self.args.eval_set_size
 
-            # Generate user indices
-            permuted_index = np.random.permutation(user_count)
-            train_user_index = permuted_index[                :-2*eval_set_size]
-            val_user_index   = permuted_index[-2*eval_set_size:  -eval_set_size]
-            test_user_index  = permuted_index[  -eval_set_size:                ]
+                genres = user2genres[user]
+                train_g[user], val_g[user], test_g[user] = genres[:-2], genres[-2:-1], genres[-1:]
 
-            # Split DataFrames
-            train_df = df.loc[df['uid'].isin(train_user_index)]
-            val_df   = df.loc[df['uid'].isin(val_user_index)]
-            test_df  = df.loc[df['uid'].isin(test_user_index)]
+            return train, val, test, train_g, val_g, test_g
+        # elif self.args.split == 'holdout':
+        #     print('Splitting')
+        #     np.random.seed(self.args.dataset_split_seed)
+        #     eval_set_size = self.args.eval_set_size
 
-            # DataFrame to dict => {uid : list of sid's}
-            train = dict(train_df.groupby('uid').progress_apply(lambda d: list(d['sid'])))
-            val   = dict(val_df.groupby('uid').progress_apply(lambda d: list(d['sid'])))
-            test  = dict(test_df.groupby('uid').progress_apply(lambda d: list(d['sid'])))
-            return train, val, test
+        #     # Generate user indices
+        #     permuted_index = np.random.permutation(user_count)
+        #     train_user_index = permuted_index[                :-2*eval_set_size]
+        #     val_user_index   = permuted_index[-2*eval_set_size:  -eval_set_size]
+        #     test_user_index  = permuted_index[  -eval_set_size:                ]
+
+        #     # Split DataFrames
+        #     train_df = df.loc[df['uid'].isin(train_user_index)]
+        #     val_df   = df.loc[df['uid'].isin(val_user_index)]
+        #     test_df  = df.loc[df['uid'].isin(test_user_index)]
+
+        #     # DataFrame to dict => {uid : list of sid's}
+        #     train = dict(train_df.groupby('uid').progress_apply(lambda d: list(d['sid'])))
+        #     val   = dict(val_df.groupby('uid').progress_apply(lambda d: list(d['sid'])))
+        #     test  = dict(test_df.groupby('uid').progress_apply(lambda d: list(d['sid'])))
+        #     return train, val, test
         else:
             raise NotImplementedError
 

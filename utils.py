@@ -111,3 +111,65 @@ class AverageMeter(object):
 
     def __format__(self, format):
         return "{self.val:{format}} ({self.avg:{format}})".format(self=self, format=format)
+
+
+class PrintInputShape:
+    def __init__(self, limit=1):
+        self.limit = limit
+        self.cnt = 1
+
+    # @classmethod
+    def print(self, t:np.array, notation):
+        if self.cnt <= self.limit:
+            print(f"{notation} : {len(t.shape)}d", end='\n')
+            if len(t.shape) == 1:
+                self.print_1d(t)
+                self.print_0d_shape(len(t))
+            elif len(t.shape) == 2:
+                self.print_2d(t)
+            elif len(t.shape) == 3:
+                self.print_3d(t)
+            else:
+                print(f"1d array or over 3d")
+            print()
+        self.cnt += 1
+
+    def print_0d_shape(self, dim):
+        print(f"\t<-- {dim} -->")
+
+    def print_1d(self, data_1d, ws='', arrow=''):
+        sample = f"[{data_1d[0]:5}, {data_1d[1]:5}, ..., {data_1d[-2]:5}, {data_1d[-1]:5}]"
+        print(f"{ws}{arrow}   {sample}")
+
+
+    def print_2d(self, t, ws=''):
+        t_trim_a = t.clone().detach()[:2]
+        t_trim_b = t.clone().detach()[-2:]
+        t_trim = np.concatenate([t_trim_a, t_trim_b], axis=0)
+        for line, data_1d in enumerate(t_trim, start=1):
+            if line == 1:
+                self.print_1d(data_1d, ws, arrow='^')
+            elif line == 2:
+                self.print_1d(data_1d, ws, arrow='|')
+            elif line == (len(t_trim)-1):
+                self.print_1d(data_1d, ws, arrow='|')
+            elif line == len(t_trim):
+                self.print_1d(data_1d, ws, arrow='v')
+            else:
+                self.print_1d('  .. ', ws, arrow='|')
+
+            if line == len(t_trim)//2:  # 중간에 숫자 끼워넣기
+                print(f"{ws}{t.size()[0]}")
+        self.print_0d_shape(t.size()[1])
+
+    def print_3d(self, t):
+        print(f"Input's shape : {t.size()}")
+        ws = ''
+        print(f"{ws}\\")
+        ws += ' '
+        print(f"{ws}{t.size()[0]}")
+        ws += ' '
+        print(f"{ws}\\")
+
+        print_2d_shape(self, t[-1], ws=ws)
+
