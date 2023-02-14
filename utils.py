@@ -139,12 +139,12 @@ class PrintInputShape:
 
     def print_1d(self, data_1d, ws='', arrow=''):
         sample = f"[{data_1d[0]:5}, {data_1d[1]:5}, ..., {data_1d[-2]:5}, {data_1d[-1]:5}]"
-        print(f"{ws}{arrow}   {sample}")
-
+        print(f"{ws}{arrow}\t{sample}")
+        
 
     def print_2d(self, t, ws=''):
-        t_trim_a = t.clone().detach()[:2]
-        t_trim_b = t.clone().detach()[-2:]
+        t_trim_a = t.clone().detach()[:3]
+        t_trim_b = t.clone().detach()[-3:]
         t_trim = np.concatenate([t_trim_a, t_trim_b], axis=0)
         for line, data_1d in enumerate(t_trim, start=1):
             if line == 1:
@@ -156,10 +156,10 @@ class PrintInputShape:
             elif line == len(t_trim):
                 self.print_1d(data_1d, ws, arrow='v')
             else:
-                self.print_1d('  .. ', ws, arrow='|')
+                self.print_1d(data_1d, ws, arrow='|')
 
             if line == len(t_trim)//2:  # 중간에 숫자 끼워넣기
-                print(f"{ws}{t.size()[0]}")
+                print(f"{ws}{t.size()[0]}\t\t\t...")
         self.print_0d_shape(t.size()[1])
 
     def print_3d(self, t):

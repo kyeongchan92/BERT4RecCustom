@@ -14,18 +14,19 @@ class BERT(nn.Module):
 
         max_len = args.bert_max_len
         num_items = args.num_items
-        num_genres = args.num_genres
+        nums_attrs = args.nums_attrs
         n_layers = args.bert_num_blocks
         heads = args.bert_num_heads
         vocab_size = num_items + 2
-        genre_size = num_genres + 2
+        if nums_attrs:
+            attrs_emb_sizes = {attr_name : size + 2 for attr_name, size in nums_attrs.items()}
         hidden = args.bert_hidden_units
         self.hidden = hidden
         dropout = args.bert_dropout
 
         # embedding for BERT, sum of positional, segment, token embeddings
         self.embedding = BERTEmbedding(vocab_size=vocab_size, embed_size=self.hidden, max_len=max_len, dropout=dropout,
-            genre_size=genre_size)
+            attrs_emb_sizes=attrs_emb_sizes)
 
         # multi-layers transformer blocks, deep network
         self.transformer_blocks = nn.ModuleList(
@@ -33,11 +34,11 @@ class BERT(nn.Module):
 
         self.out = nn.Linear(self.hidden, num_items + 1)
 
-    def forward(self, x, gnr):
+    def forward(self, x, attrs_idxs):
         mask = (x > 0).unsqueeze(1).repeat(1, x.size(1), 1).unsqueeze(1)
 
         # embedding the indexed sequence to sequence of vectors
-        x = self.embedding(x, gnr)
+        x = self.embedding(x, attrs_idxs)
 
         # running over multiple transformer blocks
         for transformer in self.transformer_blocks:

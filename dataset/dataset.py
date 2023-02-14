@@ -21,6 +21,7 @@ class ML1MDataset:
         self.min_uc = args.min_uc
         self.min_sc = args.min_sc
         self.split = args.split
+        self.attr_names = args.attr_names
 
         assert self.min_uc >= 2, 'Need at least 2 ratings per user for validation and test'
 
@@ -72,6 +73,18 @@ class ML1MDataset:
         dataset = pickle.load(dataset_path.open('rb'))
         return dataset
 
+    def load_attrs_df(self, rating_df):
+        '''
+        Return : 
+            attr_df = itemid |   genre  |  ...
+                        1    | 'comedy' |
+        '''
+        attr_df = self.load_movies_df()
+        return attr_df[['sid'] + self.attr_names]
+
+    # def get_i2attr_map(self, attrs_df):
+
+
     def preprocess(self):
         dataset_path = self._get_preprocessed_dataset_path()
         if dataset_path.is_file():
@@ -80,24 +93,40 @@ class ML1MDataset:
         if not dataset_path.parent.is_dir():
             dataset_path.parent.mkdir(parents=True)
         self.maybe_download_raw_dataset()
-        rating_df = self.load_ratings_df()
-        genre_df = self.load_movies_df()
-        df = rating_df.merge(genre_df[['sid', 'genre']], how='left', on='sid')
-
+        df = self.load_ratings_df()
         df = self.make_implicit(df)
         df = self.filter_triplets(df)
-        df, umap, smap, gmap = self.densify_index(df)
-        train, val, test, train_g, val_g, test_g = self.split_df(df, len(umap))
+        df, u_i_map = self.densify_index(df, target_cols=['sid', 'uid'])
+        tra_item_seq, val_item_seq, tes_item_seq = self.split_tra_val_tes(df, len(u_i_map['uid']))
+        if self.attr_names:
+            attrs_df = self.load_attrs_df(df)
+            attrs_df['sid'] = attrs_df['sid'].map(u_i_map['sid'])
+            attrs_df, amap = self.densify_index(attrs_df, target_cols=self.attr_names)
+            i2attr_map = {}
+            for attr_name in self.attr_names:
+                i2attr_map[attr_name] = dict(zip(attrs_df['sid'], attrs_df[attr_name]))
+        else:
+            attrs = {}
+            amap = {}
 
-        dataset = {'train': train,
-                   'val': val,
-                   'test': test,
-                   'train_g': train_g,
-                   'val_g': val_g,
-                   'test_g': test_g,
-                   'umap': umap,
-                   'smap': smap,
-                   'gmap': gmap}
+        '''
+        amap : nested dict
+        ex)
+        {
+            'attr1' : dict,
+            'attr2' : dict
+            }
+        - amap is also nested dict
+        when not using attributes, amap = {}
+        '''
+
+        dataset = {'tra_item_seq': tra_item_seq,  # dict : {densified user's id : [3, 4, ...](densified item's id)}
+                   'val_item_seq': val_item_seq,
+                   'tes_item_seq': tes_item_seq,
+                   'u_i_map' : u_i_map,
+                   'i2attr_map' : i2attr_map,
+                   'amap' : amap 
+                   }
         with dataset_path.open('wb') as f:
             pickle.dump(dataset, f)
 
@@ -148,33 +177,36 @@ class ML1MDataset:
 
         return df
 
-    def densify_index(self, df):
+    def densify_index(self, df, target_cols=['sid', 'uid']):
         print('Densifying index')
-        umap = {u: i for i, u in enumerate(set(df['uid']))}
-        smap = {s: i for i, s in enumerate(set(df['sid']))}
-        gmap = {g: i for i, g in enumerate(set(df['genre']))}
-        df['uid'] = df['uid'].map(umap)
-        df['sid'] = df['sid'].map(smap)
-        df['gid'] = df['genre'].map(gmap)
-        return df, umap, smap, gmap
+        maps = {}
+        for col in target_cols:
+            _map = {u: i for i, u in enumerate(set(df[col]))}
+            maps[col] = (_map)
+            # smap = {s: i for i, s in enumerate(set(df['sid']))}
+            df[col] = df[col].map(_map)
+            
+        return df, maps
 
-    def split_df(self, df, user_count):
+
+    def split_tra_val_tes(self, df, user_count):
         if self.args.split == 'leave_one_out':
             print('Splitting')
             user_group = df.groupby('uid')
-            user2items = user_group.progress_apply(lambda d: list(d.sort_values(by='timestamp')['sid']))
-            user2genres = user_group.progress_apply(lambda d: list(d.sort_values(by='timestamp')['gid']))
+            user2items = user_group.progress_apply(lambda u_df: list(u_df.sort_values(by='timestamp')['sid']))
+            # user2genres = user_group.progress_apply(lambda d: list(d.sort_values(by='timestamp')['gid']))
 
             train, val, test = {}, {}, {}
-            train_g, val_g, test_g = {}, {}, {}
+
+            # train_g, val_g, test_g = {}, {}, {}
             for user in range(user_count):
                 items = user2items[user]
                 train[user], val[user], test[user] = items[:-2], items[-2:-1], items[-1:]
 
-                genres = user2genres[user]
-                train_g[user], val_g[user], test_g[user] = genres[:-2], genres[-2:-1], genres[-1:]
+                # genres = user2genres[user]
+                # train_g[user], val_g[user], test_g[user] = genres[:-2], genres[-2:-1], genres[-1:]
 
-            return train, val, test, train_g, val_g, test_g
+            return train, val, test
         # elif self.args.split == 'holdout':
         #     print('Splitting')
         #     np.random.seed(self.args.dataset_split_seed)

@@ -140,4 +140,6 @@ args.bert_max_len = 100
 args.bert_num_blocks = 2
 args.bert_num_heads = 4
 
+# meta info
+args.attr_names = ['genre']
 

@@ -203,8 +203,8 @@ class BERTTrainer:
         return 'bert'
 
     def calculate_loss(self, batch):
-        seqs, gnrs, labels = batch
-        logits = self.model(seqs, gnrs)  # B x T x V
+        seqs, attrs, labels = batch
+        logits = self.model(seqs, *attrs)  # B x T x V
 
         logits = logits.view(-1, logits.size(-1))  # (B*T) x V
         labels = labels.view(-1)  # B*T
@@ -212,8 +212,8 @@ class BERTTrainer:
         return loss
 
     def calculate_metrics(self, batch):
-        seqs, gnrs, candidates, labels = batch
-        scores = self.model(seqs, gnrs)  # B x T x V
+        seqs, attrs, candidates, labels = batch
+        scores = self.model(seqs, *attrs)  # B x T x V
         scores = scores[:, -1, :]  # B x V
         scores = scores.gather(1, candidates)  # B x C
 
