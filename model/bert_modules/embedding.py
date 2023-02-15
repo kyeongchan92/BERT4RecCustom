@@ -1,5 +1,6 @@
 import math
 
+import torch
 import torch.nn as nn
 
 from utils import PrintInputShape
@@ -13,7 +14,7 @@ class BERTEmbedding(nn.Module):
         sum of all these features are output of BERTEmbedding
     """
 
-    def __init__(self, vocab_size, embed_size, max_len, attrs_emb_sizes, dropout=0.1):
+    def __init__(self, vocab_size, embed_size, max_len, use_attributes, attrs_each_size, i2attr_map, dropout=0.1):
         """
         :param vocab_size: total vocab size
         :param embed_size: embedding size of token embedding
@@ -22,25 +23,33 @@ class BERTEmbedding(nn.Module):
         super().__init__()
         self.token = TokenEmbedding(vocab_size=vocab_size, embed_size=embed_size)
         self.position = PositionalEmbedding(max_len=max_len, d_model=embed_size)
-        if attrs_emb_sizes:
-            self.attrs = []
-            for attr_size in attrs_emb_sizes.values():
-                self.attrs.append(nn.Embedding(attr_size, embed_size))
         self.dropout = nn.Dropout(p=dropout)
         self.embed_size = embed_size
-
+        self.use_attributes = use_attributes
         self.printer = PrintInputShape(2)
 
-    def forward(self, sequence, attrs_idxs):
-        # print(self.printer.cnt)
-        self.printer.print(sequence, notation='sequence')
-        self.printer.print(attrs_idxs, notation='attrs_idxs')
-        
-        attr_emb_sum = torch.empty(len(sequence), self.embed_size)
-        for idxs, attr_emb_mat in zip(attrs_idxs, self.attrs):
-            attr_emb_sum += attr_emb_mat(idxs)
+        if use_attributes:
+            self.i2attr_map = i2attr_map
+            self.attrs_emb_mats = {}
+            for attr_name, size in attrs_each_size.items():
+                self.attrs_emb_mats[attr_name] = nn.Embedding(size, embed_size)
 
-        x = self.token(sequence) + self.position(sequence) + attr_emb_sum
+    def forward(self, sequence):
+        # print(self.printer.cnt)
+        # self.printer.print(sequence, notation='sequence')
+        # self.printer.print(attrs_idxs, notation='attrs_idxs')
+        if self.use_attributes:
+            x, idxs = sequence
+            x = self.token(sequence) + self.position(sequence)
+            attr_sum = torch.empty(len(sequence), self.embed_size)
+            for attr_name in self.i2attr_map:
+                self.printer.print(sequence, 'sequence')
+                idxs = torch.LongTensor([self.i2attr_map[attr_name][item] for item in sequence])
+                attr_sum += self.attrs_emb_mats[attr_name](idxs)
+            x += attr_sum
+        else:
+            x = self.token(sequence) + self.position(sequence)
+        
         return self.dropout(x)
 
 

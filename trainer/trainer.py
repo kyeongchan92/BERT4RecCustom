@@ -162,7 +162,7 @@ class BERTTrainer:
     def _create_optimizer(self):
         args = self.args
         if args.optimizer.lower() == 'adam':
-            return optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+            return  v
         elif args.optimizer.lower() == 'sgd':
             return optim.SGD(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
         else:
@@ -203,8 +203,8 @@ class BERTTrainer:
         return 'bert'
 
     def calculate_loss(self, batch):
-        seqs, attrs, labels = batch
-        logits = self.model(seqs, *attrs)  # B x T x V
+        *seqs, labels = batch
+        logits = self.model(seqs)  # B x T x V
 
         logits = logits.view(-1, logits.size(-1))  # (B*T) x V
         labels = labels.view(-1)  # B*T
@@ -212,8 +212,8 @@ class BERTTrainer:
         return loss
 
     def calculate_metrics(self, batch):
-        seqs, attrs, candidates, labels = batch
-        scores = self.model(seqs, *attrs)  # B x T x V
+        seqs, candidates, labels = batch
+        scores = self.model(seqs)  # B x T x V
         scores = scores[:, -1, :]  # B x V
         scores = scores.gather(1, candidates)  # B x C
 

@@ -138,7 +138,7 @@ class PrintInputShape:
         print(f"\t<-- {dim} -->")
 
     def print_1d(self, data_1d, ws='', arrow=''):
-        sample = f"[{data_1d[0]:5}, {data_1d[1]:5}, ..., {data_1d[-2]:5}, {data_1d[-1]:5}]"
+        sample = f"[{data_1d[0]:8.4f}, {data_1d[1]:8.4f}, ..., {data_1d[-2]:8.4f}, {data_1d[-1]:8.4f}]"
         print(f"{ws}{arrow}\t{sample}")
         
 
@@ -171,5 +171,4 @@ class PrintInputShape:
         ws += ' '
         print(f"{ws}\\")
 
-        print_2d_shape(self, t[-1], ws=ws)
-
+        self.print_2d(t[-1], ws=ws)

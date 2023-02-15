@@ -13,7 +13,7 @@ if __name__ == '__main__':
     dataloader = BertDataloader(args, dataset)
     train_loader, val_loader, test_loader = dataloader.get_pytorch_dataloaders()
 
-    model = BERT(args)
+    model = BERT(args, dataloader.i2attr_map)
 
     trainer = BERTTrainer(args, model, train_loader, val_loader, test_loader, export_root)
 

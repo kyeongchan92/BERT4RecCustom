@@ -6,7 +6,7 @@ from utils import fix_random_seed_as
 
 
 class BERT(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, i2attr_map):
         super().__init__()
         self.args = args
         fix_random_seed_as(args.model_init_seed)
@@ -14,19 +14,20 @@ class BERT(nn.Module):
 
         max_len = args.bert_max_len
         num_items = args.num_items
-        nums_attrs = args.nums_attrs
+        attrs_each_size = args.attrs_each_size
         n_layers = args.bert_num_blocks
         heads = args.bert_num_heads
         vocab_size = num_items + 2
-        if nums_attrs:
-            attrs_emb_sizes = {attr_name : size + 2 for attr_name, size in nums_attrs.items()}
+        if args.use_attributes:
+            use_attributes = args.use_attributes
+    
         hidden = args.bert_hidden_units
         self.hidden = hidden
         dropout = args.bert_dropout
 
         # embedding for BERT, sum of positional, segment, token embeddings
-        self.embedding = BERTEmbedding(vocab_size=vocab_size, embed_size=self.hidden, max_len=max_len, dropout=dropout,
-            attrs_emb_sizes=attrs_emb_sizes)
+        self.embedding = BERTEmbedding(vocab_size=vocab_size, embed_size=self.hidden, max_len=max_len, 
+        use_attributes=use_attributes, attrs_each_size=attrs_each_size, i2attr_map=i2attr_map, dropout=dropout)
 
         # multi-layers transformer blocks, deep network
         self.transformer_blocks = nn.ModuleList(
@@ -34,11 +35,11 @@ class BERT(nn.Module):
 
         self.out = nn.Linear(self.hidden, num_items + 1)
 
-    def forward(self, x, attrs_idxs):
+    def forward(self, x, attrs):
         mask = (x > 0).unsqueeze(1).repeat(1, x.size(1), 1).unsqueeze(1)
 
         # embedding the indexed sequence to sequence of vectors
-        x = self.embedding(x, attrs_idxs)
+        x = self.embedding(x, attrs)
 
         # running over multiple transformer blocks
         for transformer in self.transformer_blocks:

@@ -26,21 +26,26 @@ class BertDataloader:
         self.umap = dataset['u_i_map']['uid']
         self.smap = dataset['u_i_map']['sid']
         
-        self.i2attr_map = dataset['i2attr_map']
 
         self.user_count = len(self.umap)
         self.item_count = len(self.smap)
-        self.attr_count = {attr_name : len(_map) for attr_name, _map in self.i2attr_map.items()}
 
         args.num_items = len(self.smap)
-        args.nums_attrs = {attr_name : len(_map) for attr_name, _map in self.i2attr_map.items()}
         self.max_len = args.bert_max_len
         self.mask_prob = args.bert_mask_prob
         self.CLOZE_MASK_TOKEN = self.item_count + 1
-        self.ATTRS_MASK_TOKENS = {attr_name : cnt+1 for attr_name, cnt in self.attr_count.items()}
-        for attr_name in self.args.attr_names:
-            self.i2attr_map[attr_name][self.CLOZE_MASK_TOKEN] = self.ATTRS_MASK_TOKENS[attr_name]
-            self.i2attr_map[attr_name][0] = 0
+
+        # attributes
+        self.i2attr_map = dataset['i2attr_map']
+        self.use_attributes = args.use_attributes
+        if self.use_attributes:
+            attrs_each_size = [len(_map) for _map in self.i2attr_map]
+            args.attrs_each_size = attrs_each_size
+            
+            self.ATTRS_MASK_TOKENS = [size+1 for size in attrs_each_size]
+            for _map, m_token in zip(self.i2attr_map, self.ATTRS_MASK_TOKENS):
+                _map[self.CLOZE_MASK_TOKEN] = m_token  # item's mask token to attr's mask token
+                _map[0] = 0  # pad token too
 
 
         code = args.train_negative_sampler_code
@@ -69,6 +74,7 @@ class BertDataloader:
         test_loader = self._get_test_loader()
         return train_loader, val_loader, test_loader
 
+    # Get train loader #################
     def _get_train_loader(self):
         dataset = self._get_train_dataset()
         dataloader = data_utils.DataLoader(dataset, batch_size=self.args.train_batch_size,
@@ -77,15 +83,21 @@ class BertDataloader:
 
     def _get_train_dataset(self):
         dataset = BertTrainDataset(self.train, self.max_len, self.mask_prob, self.CLOZE_MASK_TOKEN, self.item_count, self.rng,
-        self.i2attr_map)
+        self.i2attr_map, self.use_attributes)
         return dataset
+    ###################################
 
+    # Get val loader #################
     def _get_val_loader(self):
         return self._get_eval_loader(mode='val')
+    ###################################
 
+    # Get test loader #################
     def _get_test_loader(self):
         return self._get_eval_loader(mode='test')
-
+    ###################################
+    
+    # val, test common #################
     def _get_eval_loader(self, mode):
         batch_size = self.args.val_batch_size if mode == 'val' else self.args.test_batch_size
         dataset = self._get_eval_dataset(mode)
@@ -95,12 +107,14 @@ class BertDataloader:
 
     def _get_eval_dataset(self, mode):
         answers = self.val if mode == 'val' else self.test
-        dataset = BertEvalDataset(self.args, self.train, answers, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_samples, self.i2attr_map)
+        dataset = BertEvalDataset(self.args, self.train, answers, self.max_len, self.CLOZE_MASK_TOKEN, self.test_negative_samples, 
+        self.i2attr_map, self.use_attributes)
         return dataset
+    ###################################
 
 
 class BertTrainDataset(data_utils.Dataset):
-    def __init__(self, u2seq, max_len, mask_prob, seq_mask_token, num_items, rng, i2attr_map):
+    def __init__(self, u2seq, max_len, mask_prob, seq_mask_token, num_items, rng, i2attr_map, use_attributes):
         self.u2seq = u2seq
         self.users = sorted(self.u2seq.keys())
         self.max_len = max_len
@@ -109,10 +123,10 @@ class BertTrainDataset(data_utils.Dataset):
         self.num_items = num_items
         self.rng = rng
 
+        self.use_attributes = use_attributes
         self.i2attr_map = i2attr_map
 
         self.printer = PrintInputShape(3)
-        
 
     def __len__(self):
         return len(self.users)
@@ -123,6 +137,7 @@ class BertTrainDataset(data_utils.Dataset):
 
         tokens = []
         labels = []
+        attrs = []
 
         for s, g in zip(seq, gnr):
             prob = self.rng.random()
@@ -149,17 +164,16 @@ class BertTrainDataset(data_utils.Dataset):
         tokens = [0] * mask_len + tokens
         labels = [0] * mask_len + labels
 
-        attrs = {}
-        for attr_name in self.args.attr_names:
-            attrs[attr_name] = torch.LongTensor([self.i2attr_map[attr_name][item] for item in tokens])
+        if self.use_attributes:
+            attr_idx = torch.LongTensor([self.i2attr_map[attr_name][item] for item in sequence])
+            attrs.append(attr_idx)
 
-
-        return torch.LongTensor(tokens), torch.LongTensor(labels), attrs
+        return torch.LongTensor(tokens), torch.LongTensor(attrs), torch.LongTensor(labels)
 
 
 
 class BertEvalDataset(data_utils.Dataset):
-    def __init__(self, args, u2seq, u2answer, max_len, seq_mask_token, negative_samples, i2attr_map):
+    def __init__(self, args, u2seq, u2answer, max_len, seq_mask_token, negative_samples, i2attr_map, use_attributes):
         self.u2seq = u2seq
         self.users = sorted(self.u2seq.keys())
         self.u2answer = u2answer
@@ -178,17 +192,17 @@ class BertEvalDataset(data_utils.Dataset):
         seq = self.u2seq[user]
         answer = self.u2answer[user]
         negs = self.negative_samples[user]
+        attrs = []
 
         candidates = answer + negs
         labels = [1] * len(answer) + [0] * len(negs)
         seq = self.padding_and_trim(seq, 'seq')
 
-        attrs = {}
-        for attr_name in self.i2attr_map.keys():
-            attrs[attr_name] = torch.LongTensor([self.i2attr_map[attr_name][item] for item in seq])
+        if self.use_attributes:
+            attr_idx = torch.LongTensor([self.i2attr_map[attr_name][item] for item in sequence])
+            attrs.append(attr_idx)
 
-
-        return torch.LongTensor(seq), attrs, torch.LongTensor(candidates), torch.LongTensor(labels)
+        return torch.LongTensor(seq), torch.LongTensor(attrs), torch.LongTensor(candidates), torch.LongTensor(labels)
 
 
     def padding_and_trim(self, seq, seq_type):
@@ -198,3 +212,6 @@ class BertEvalDataset(data_utils.Dataset):
         padding_len = self.max_len - len(seq)
         seq = [0] * padding_len + seq
         return seq
+
+
+

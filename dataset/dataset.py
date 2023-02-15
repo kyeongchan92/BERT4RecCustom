@@ -21,7 +21,9 @@ class ML1MDataset:
         self.min_uc = args.min_uc
         self.min_sc = args.min_sc
         self.split = args.split
-        self.attr_names = args.attr_names
+        if args.use_attributes:
+            self.use_attributes = args.use_attributes
+            self.attributes = args.attributes
 
         assert self.min_uc >= 2, 'Need at least 2 ratings per user for validation and test'
 
@@ -80,7 +82,7 @@ class ML1MDataset:
                         1    | 'comedy' |
         '''
         attr_df = self.load_movies_df()
-        return attr_df[['sid'] + self.attr_names]
+        return attr_df[['sid'] + self.attributes]
 
     # def get_i2attr_map(self, attrs_df):
 
@@ -98,15 +100,16 @@ class ML1MDataset:
         df = self.filter_triplets(df)
         df, u_i_map = self.densify_index(df, target_cols=['sid', 'uid'])
         tra_item_seq, val_item_seq, tes_item_seq = self.split_tra_val_tes(df, len(u_i_map['uid']))
-        if self.attr_names:
+
+        # attributes
+        i2attr_map = []
+        if self.use_attributes:
             attrs_df = self.load_attrs_df(df)
             attrs_df['sid'] = attrs_df['sid'].map(u_i_map['sid'])
-            attrs_df, amap = self.densify_index(attrs_df, target_cols=self.attr_names)
-            i2attr_map = {}
-            for attr_name in self.attr_names:
-                i2attr_map[attr_name] = dict(zip(attrs_df['sid'], attrs_df[attr_name]))
+            attrs_df, amap = self.densify_index(attrs_df, target_cols=self.attributes)
+            for attr_name in self.attributes:
+                i2attr_map.append(dict(zip(attrs_df['sid'], attrs_df[attr_name])))
         else:
-            attrs = {}
             amap = {}
 
         '''
@@ -181,7 +184,7 @@ class ML1MDataset:
         print('Densifying index')
         maps = {}
         for col in target_cols:
-            _map = {u: i for i, u in enumerate(set(df[col]))}
+            _map = {u: i for i, u in enumerate(set(df[col]), start=1)}
             maps[col] = (_map)
             # smap = {s: i for i, s in enumerate(set(df['sid']))}
             df[col] = df[col].map(_map)
@@ -199,7 +202,7 @@ class ML1MDataset:
             train, val, test = {}, {}, {}
 
             # train_g, val_g, test_g = {}, {}, {}
-            for user in range(user_count):
+            for user in range(1, user_count+1):
                 items = user2items[user]
                 train[user], val[user], test[user] = items[:-2], items[-2:-1], items[-1:]
 
